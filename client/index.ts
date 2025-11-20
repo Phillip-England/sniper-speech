@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-// 1. Manually define the missing interfaces to stop TypeScript errors
+// 1. Interfaces
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
@@ -23,22 +23,26 @@ interface IWindow extends Window {
   webkitSpeechRecognition?: SpeechRecognitionConstructor;
 }
 
-// 2. Main Logic
+// 2. Element Selection
 const btn = document.getElementById('record-button') as HTMLButtonElement;
 const transcriptEl = document.getElementById('transcript') as HTMLParagraphElement;
 const interimEl = document.getElementById('interim') as HTMLParagraphElement;
 const outputContainer = document.getElementById('output-container') as HTMLDivElement;
 const placeholder = document.getElementById('placeholder') as HTMLDivElement;
 const statusText = document.getElementById('status-text') as HTMLDivElement;
-
 const copyBtn = outputContainer.querySelector('button') as HTMLButtonElement;
 
+// 3. State Management
 let isRecording: boolean = false;
 let recognition: SpeechRecognition | null = null;
 
-// Fix: Use the actual Class, not the Event
 const SpeechRecognitionCtor = (window as unknown as IWindow).SpeechRecognition || 
                               (window as unknown as IWindow).webkitSpeechRecognition;
+
+// 4. Tailwind Class Sets
+// We separate these to avoid conflicts between hover states and active recording states
+const defaultClasses = ['bg-red-600', 'hover:scale-105', 'hover:bg-red-500'];
+const recordingClasses = ['bg-red-700', 'animate-pulse', 'ring-4', 'ring-red-900'];
 
 if (!SpeechRecognitionCtor) {
   alert("Your browser does not support speech recognition. Try Chrome or Safari.");
@@ -50,16 +54,23 @@ if (!SpeechRecognitionCtor) {
 
   recognition.onstart = () => {
     isRecording = true;
-    btn.classList.add('is-recording');
+    
+    // Switch to Recording Visuals
+    btn.classList.remove(...defaultClasses);
+    btn.classList.add(...recordingClasses);
+    
     statusText.classList.remove('opacity-0');
-
     outputContainer.classList.remove('opacity-0', 'translate-y-10');
     placeholder.textContent = "Listening...";
   };
 
   recognition.onend = () => {
     isRecording = false;
-    btn.classList.remove('is-recording');
+    
+    // Switch back to Default Visuals
+    btn.classList.remove(...recordingClasses);
+    btn.classList.add(...defaultClasses);
+    
     statusText.classList.add('opacity-0');
     placeholder.textContent = "Tap button to speak...";
 
@@ -123,7 +134,6 @@ if (btn) {
 }
 
 if (copyBtn) {
-  // Clear old inline listeners if any
   copyBtn.onclick = null; 
   
   copyBtn.addEventListener('click', () => {

@@ -9,6 +9,8 @@ var copyBtn = outputContainer.querySelector("button");
 var isRecording = false;
 var recognition = null;
 var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+var defaultClasses = ["bg-red-600", "hover:scale-105", "hover:bg-red-500"];
+var recordingClasses = ["bg-red-700", "animate-pulse", "ring-4", "ring-red-900"];
 if (!SpeechRecognitionCtor) {
   alert("Your browser does not support speech recognition. Try Chrome or Safari.");
 } else {
@@ -18,14 +20,16 @@ if (!SpeechRecognitionCtor) {
   recognition.lang = "en-US";
   recognition.onstart = () => {
     isRecording = true;
-    btn.classList.add("is-recording");
+    btn.classList.remove(...defaultClasses);
+    btn.classList.add(...recordingClasses);
     statusText.classList.remove("opacity-0");
     outputContainer.classList.remove("opacity-0", "translate-y-10");
     placeholder.textContent = "Listening...";
   };
   recognition.onend = () => {
     isRecording = false;
-    btn.classList.remove("is-recording");
+    btn.classList.remove(...recordingClasses);
+    btn.classList.add(...defaultClasses);
     statusText.classList.add("opacity-0");
     placeholder.textContent = "Tap button to speak...";
     if (transcriptEl.innerText.trim().length > 0) {
