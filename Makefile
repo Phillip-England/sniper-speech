@@ -1,5 +1,8 @@
 dev:
-	bun './app/**/*.html'
+	bun './app/**/*.html';
 
 tw:
-	tailwindcss -i ./static/input.css -o ./static/output.css --watch
+	tailwindcss -i ./static/input.css -o ./static/output.css --watch;
+
+bundle:
+	bun build ./client/index.ts --outdir ./static --watch;
