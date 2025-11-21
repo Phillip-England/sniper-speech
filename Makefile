@@ -6,3 +6,6 @@ tw:
 
 bundle:
 	bun build ./client/index.ts --outdir ./static --watch;
+
+server:
+	uvicorn main:app --reload;

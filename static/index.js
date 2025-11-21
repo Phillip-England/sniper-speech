@@ -6,11 +6,21 @@ var outputContainer = document.getElementById("output-container");
 var placeholder = document.getElementById("placeholder");
 var statusText = document.getElementById("status-text");
 var copyBtn = outputContainer.querySelector("button");
+var greenDot = document.getElementById("green-dot");
 var isRecording = false;
+var isLogging = true;
+var shouldContinue = false;
 var recognition = null;
 var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
 var defaultClasses = ["bg-red-600", "hover:scale-105", "hover:bg-red-500"];
 var recordingClasses = ["bg-red-700", "animate-pulse", "ring-4", "ring-red-900"];
+function updateGreenDot() {
+  if (isRecording && isLogging) {
+    greenDot.classList.remove("opacity-0");
+  } else {
+    greenDot.classList.add("opacity-0");
+  }
+}
 if (!SpeechRecognitionCtor) {
   alert("Your browser does not support speech recognition. Try Chrome or Safari.");
 } else {
@@ -20,6 +30,7 @@ if (!SpeechRecognitionCtor) {
   recognition.lang = "en-US";
   recognition.onstart = () => {
     isRecording = true;
+    updateGreenDot();
     btn.classList.remove(...defaultClasses);
     btn.classList.add(...recordingClasses);
     statusText.classList.remove("opacity-0");
@@ -27,7 +38,12 @@ if (!SpeechRecognitionCtor) {
     placeholder.textContent = "Listening...";
   };
   recognition.onend = () => {
+    if (shouldContinue) {
+      recognition?.start();
+      return;
+    }
     isRecording = false;
+    updateGreenDot();
     btn.classList.remove(...recordingClasses);
     btn.classList.add(...defaultClasses);
     statusText.classList.add("opacity-0");
@@ -55,23 +71,63 @@ if (!SpeechRecognitionCtor) {
       }
     }
     if (final) {
-      transcriptEl.innerText += final + " ";
+      const command = final.toLowerCase().trim().replace(/[.,?!]/g, "");
+      if (command === "exit") {
+        shouldContinue = false;
+        stopRecording();
+        return;
+      }
+      if (command === "stop") {
+        transcriptEl.innerText = "";
+        interimEl.innerText = "";
+        placeholder.classList.remove("hidden");
+        isLogging = false;
+        updateGreenDot();
+        return;
+      }
+      if (command === "start") {
+        isLogging = true;
+        updateGreenDot();
+        return;
+      }
+      if (command === "clear") {
+        transcriptEl.innerText = "";
+        interimEl.innerText = "";
+        placeholder.classList.remove("hidden");
+        return;
+      }
+      if (isLogging) {
+        transcriptEl.innerText += final + " ";
+      }
     }
-    interimEl.innerText = interim;
+    if (isLogging) {
+      interimEl.innerText = interim;
+    } else {
+      interimEl.innerText = "";
+    }
     if (transcriptEl.innerText || interimEl.innerText) {
       placeholder.classList.add("hidden");
+    } else {
+      placeholder.classList.remove("hidden");
     }
   };
   recognition.onerror = (event) => {
-    console.error("Speech Error:", event.error);
-    stopRecording();
+    if (event.error === "no-speech")
+      return;
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      shouldContinue = false;
+      stopRecording();
+    }
   };
 }
 function startRecording() {
+  shouldContinue = true;
+  isLogging = true;
   if (recognition)
     recognition.start();
 }
 function stopRecording() {
+  shouldContinue = false;
   if (recognition)
     recognition.stop();
 }
