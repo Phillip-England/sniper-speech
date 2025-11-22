@@ -1,7 +1,9 @@
 /// <reference lib="dom" />
 
-// --- 1. Missing TypeScript Interfaces ---
-
+/**
+ * SECTION 1: TYPE DEFINITIONS
+ * (No changes here)
+ */
 interface SpeechRecognitionEvent extends Event {
   resultIndex: number;
   results: SpeechRecognitionResultList;
@@ -52,230 +54,391 @@ interface IWindow extends Window {
   webkitSpeechRecognition?: SpeechRecognitionConstructor;
 }
 
-// --- 2. Audio Setup ---
+/**
+ * SECTION 2: AUDIO MANAGER CLASS
+ */
+type SoundType = 'sniper-on' | 'sniper-off' | 'sniper-exit' | 'click' | 'sniper-clear' | 'sniper-copy' | 'sniper-search' | 'sniper-visit';
 
-type SoundType = 'on' | 'off' | 'exit'; 
+class AudioManager {
+  private sounds: Record<SoundType, HTMLAudioElement>;
 
-// Note: Ensure your server is serving the 'static' folder at the root level.
-// If you get "NotSupportedError", check that http://localhost:port/static/on.wav actually loads in a new tab.
-const sounds: Record<SoundType, HTMLAudioElement> = {
-  on: new Audio('/static/on.wav'),
-  off: new Audio('/static/off.wav'),
-  exit: new Audio('/static/exit.wav'),
-};
+  constructor() {
+    this.sounds = {
+      'sniper-on': new Audio('/static/sniper-on.wav'),
+      'sniper-off': new Audio('/static/sniper-off.wav'),
+      'sniper-exit': new Audio('/static/sniper-exit.wav'),
+      'sniper-clear': new Audio('/static/sniper-clear.wav'),
+      'sniper-copy': new Audio('/static/sniper-copy.wav'),
+      'sniper-search': new Audio('/static/sniper-search.wav'), 
+      'sniper-visit': new Audio('/static/sniper-visit.wav'), 
+      'click': new Audio('/static/click.wav'),
+    };
+    this.preloadSounds();
+  }
 
-// Preload sounds
-Object.values(sounds).forEach((sound) => {
-  sound.preload = 'auto'; 
-  sound.load();           
-});
+  private preloadSounds() {
+    Object.values(this.sounds).forEach((sound) => {
+      sound.preload = 'auto';
+      sound.load();
+    });
+  }
 
-const playSound = (type: SoundType) => {
-  const audio = sounds[type];
-  audio.currentTime = 0; 
-  
-  audio.play().catch((e) => {
-    console.warn(`Audio playback failed for ${type}. Check file path /static/${type}.wav`, e);
-  });
-};
-
-// --- 3. Main Logic ---
-
-const btn = document.getElementById('record-button') as HTMLButtonElement;
-const transcriptEl = document.getElementById('transcript') as HTMLParagraphElement;
-const interimEl = document.getElementById('interim') as HTMLParagraphElement;
-const outputContainer = document.getElementById('output-container') as HTMLDivElement;
-const placeholder = document.getElementById('placeholder') as HTMLDivElement;
-const statusText = document.getElementById('status-text') as HTMLDivElement;
-const copyBtn = outputContainer.querySelector('button') as HTMLButtonElement;
-const greenDot = document.getElementById('green-dot') as HTMLDivElement;
-
-let isRecording: boolean = false;
-let isLogging: boolean = true;
-let shouldContinue: boolean = false;
-
-let recognition: SpeechRecognition | null = null;
-
-const SpeechRecognitionCtor = (window as unknown as IWindow).SpeechRecognition || 
-                (window as unknown as IWindow).webkitSpeechRecognition;
-
-const defaultClasses = ['bg-red-600', 'hover:scale-105', 'hover:bg-red-500'];
-const recordingClasses = ['bg-red-700', 'animate-pulse', 'ring-4', 'ring-red-900'];
-
-function updateGreenDot() {
-  if (isRecording && isLogging) {
-    greenDot.classList.remove('opacity-0');
-  } else {
-    greenDot.classList.add('opacity-0');
+  public play(type: SoundType) {
+    const audio = this.sounds[type];
+    audio.currentTime = 0;
+    audio.play().catch((e) => {
+      console.warn(`Audio playback failed for ${type}`, e);
+    });
   }
 }
 
-if (!SpeechRecognitionCtor) {
-  alert("Your browser does not support speech recognition. Try Chrome or Safari.");
-} else {
-  recognition = new SpeechRecognitionCtor();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-US';
+/**
+ * SECTION 3: UI MANAGER CLASS
+ * (No changes here)
+ */
+class UIManager {
+  private btn: HTMLButtonElement;
+  private transcriptEl: HTMLParagraphElement;
+  private interimEl: HTMLParagraphElement;
+  private outputContainer: HTMLDivElement;
+  private placeholder: HTMLDivElement;
+  private statusText: HTMLDivElement;
+  private copyBtn: HTMLButtonElement;
+  private greenDot: HTMLDivElement;
 
-  recognition.onstart = () => {
-    // Play ON sound when the system actually starts listening
-    playSound('on'); 
-    
-    isRecording = true;
-    
-    updateGreenDot();
-    
-    btn.classList.remove(...defaultClasses);
-    btn.classList.add(...recordingClasses);
-    
-    statusText.classList.remove('opacity-0');
-    outputContainer.classList.remove('opacity-0', 'translate-y-10');
-    placeholder.textContent = "Listening...";
-  };
+  private readonly defaultClasses = ['bg-red-600', 'hover:scale-105', 'hover:bg-red-500'];
+  private readonly recordingClasses = ['bg-red-700', 'animate-pulse', 'ring-4', 'ring-red-900'];
 
-  recognition.onend = () => {
-    if (shouldContinue) {
-      recognition?.start();
-      return; 
-    }
+  constructor() {
+    this.btn = document.getElementById('record-button') as HTMLButtonElement;
+    this.transcriptEl = document.getElementById('transcript') as HTMLParagraphElement;
+    this.interimEl = document.getElementById('interim') as HTMLParagraphElement;
+    this.outputContainer = document.getElementById('output-container') as HTMLDivElement;
+    this.placeholder = document.getElementById('placeholder') as HTMLDivElement;
+    this.statusText = document.getElementById('status-text') as HTMLDivElement;
+    this.copyBtn = this.outputContainer.querySelector('button') as HTMLButtonElement;
+    this.greenDot = document.getElementById('green-dot') as HTMLDivElement;
 
-    isRecording = false;
-    updateGreenDot();
-    
-    btn.classList.remove(...recordingClasses);
-    btn.classList.add(...defaultClasses);
-    
-    statusText.classList.add('opacity-0');
-    placeholder.textContent = "Tap button to speak...";
+    this.setupCopyButton();
+  }
 
-    if (transcriptEl.innerText.trim().length > 0) {
-      placeholder.classList.add('hidden');
+  public getRecordButton(): HTMLButtonElement {
+    return this.btn;
+  }
+
+  public updateGreenDot(isRecording: boolean, isLogging: boolean) {
+    if (isRecording && isLogging) {
+      this.greenDot.classList.remove('opacity-0');
     } else {
-      placeholder.classList.remove('hidden');
+      this.greenDot.classList.add('opacity-0');
     }
-  };
+  }
 
-  recognition.onresult = (event: SpeechRecognitionEvent) => {
-    let final = '';
-    let interim = '';
-
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      const result = event.results[i];
-      if (!result) continue;
-
-      const inner = result[0];
-      if (!inner) continue;
-
-      if (result.isFinal) {
-        final += inner.transcript;
-      } else {
-        interim += inner.transcript;
-      }
+  public setRecordingState(isRecording: boolean) {
+    if (isRecording) {
+      this.btn.classList.remove(...this.defaultClasses);
+      this.btn.classList.add(...this.recordingClasses);
+      this.statusText.classList.remove('opacity-0');
+      this.outputContainer.classList.remove('opacity-0', 'translate-y-10');
+      this.placeholder.textContent = "Listening...";
+    } else {
+      this.btn.classList.remove(...this.recordingClasses);
+      this.btn.classList.add(...this.defaultClasses);
+      this.statusText.classList.add('opacity-0');
+      this.placeholder.textContent = "Tap button to speak...";
+      this.togglePlaceholder();
     }
+  }
 
-    if (final) {
-      const command = final.toLowerCase().trim().replace(/[.,?!]/g, '');
-
-      if (command === 'exit') {
-        playSound('exit'); 
-        
-        // Clear UI
-        transcriptEl.innerText = '';
-        interimEl.innerText = '';
-        placeholder.classList.remove('hidden');
-
-        shouldContinue = false;
-        stopRecording();
-        return;
-      }
-
-      if (command === 'stop') {
-        playSound('off'); 
-        
-        transcriptEl.innerText = '';
-        interimEl.innerText = '';
-        placeholder.classList.remove('hidden');
-        
-        isLogging = false; 
-        updateGreenDot();
-        return;
-      }
-
-      if (command === 'start') {
-        playSound('on'); 
-        
-        isLogging = true;
-        updateGreenDot();
-        return;
-      }
-
-      if (command === 'clear') {
-        transcriptEl.innerText = '';
-        interimEl.innerText = ''; 
-        placeholder.classList.remove('hidden');
-        return; 
-      }
-      
-      if (isLogging) {
-        transcriptEl.innerText += final + ' ';
-      }
+  public updateText(final: string, interim: string, isLogging: boolean) {
+    if (isLogging && final) {
+      this.transcriptEl.innerText += final + ' ';
     }
     
     if (isLogging) {
-      interimEl.innerText = interim;
+      this.interimEl.innerText = interim;
     } else {
-      interimEl.innerText = '';
+      this.interimEl.innerText = '';
     }
+    this.togglePlaceholder();
+  }
 
-    if (transcriptEl.innerText || interimEl.innerText) {
-      placeholder.classList.add('hidden');
+  public clearText() {
+    this.transcriptEl.innerText = '';
+    this.interimEl.innerText = '';
+    this.togglePlaceholder();
+  }
+
+  public getText(): string {
+    return this.transcriptEl.innerText;
+  }
+
+  private togglePlaceholder() {
+    if (this.transcriptEl.innerText || this.interimEl.innerText) {
+      this.placeholder.classList.add('hidden');
     } else {
-      placeholder.classList.remove('hidden');
+      this.placeholder.classList.remove('hidden');
     }
+  }
+
+  private setupCopyButton() {
+    if (!this.copyBtn) return;
+    this.copyBtn.onclick = null;
+    this.copyBtn.addEventListener('click', () => {
+      const text = this.transcriptEl.innerText;
+      if (text) {
+        navigator.clipboard.writeText(text);
+        const originalText = this.copyBtn.innerText;
+        this.copyBtn.innerText = "[ COPIED! ]";
+        setTimeout(() => this.copyBtn.innerText = originalText, 2000);
+      }
+    });
+  }
+}
+
+/**
+ * SECTION 4: SNIPER CORE CLASS
+ */
+class SniperCore {
+  private audio: AudioManager;
+  private ui: UIManager;
+  private recognition: SpeechRecognition | null = null;
+
+  // UPDATED: Track windows opened by Sniper
+  private openedWindows: Window[] = [];
+
+  private state = {
+    isRecording: false,
+    isLogging: true,
+    shouldContinue: false
   };
 
-  recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-    if (event.error === 'no-speech') return;
-    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-      shouldContinue = false;
-      stopRecording();
+  constructor(audio: AudioManager, ui: UIManager) {
+    this.audio = audio;
+    this.ui = ui;
+    this.initializeSpeechEngine();
+    this.bindEvents();
+  }
+
+  private initializeSpeechEngine() {
+    const SpeechRecognitionCtor = (window as unknown as IWindow).SpeechRecognition || 
+                                  (window as unknown as IWindow).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      alert("Browser not supported. Try Chrome/Safari.");
+      return;
     }
-  };
-}
 
-function startRecording() {
-  shouldContinue = true; 
-  isLogging = true;
-  if (recognition) recognition.start();
-}
+    this.recognition = new SpeechRecognitionCtor();
+    this.recognition.continuous = true;
+    this.recognition.interimResults = true;
+    this.recognition.lang = 'en-US';
 
-function stopRecording() {
-  shouldContinue = false; 
-  if (recognition) recognition.stop();
-}
+    this.setupRecognitionHandlers();
+  }
 
-if (btn) {
-  btn.addEventListener('click', () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
+  private setupRecognitionHandlers() {
+    if (!this.recognition) return;
+
+    this.recognition.onstart = () => {
+      if (!this.state.isRecording) {
+        this.audio.play('sniper-on');
+      }
+      this.state.isRecording = true;
+      this.ui.setRecordingState(true);
+      this.ui.updateGreenDot(this.state.isRecording, this.state.isLogging);
+    };
+
+    this.recognition.onend = () => {
+      if (this.state.shouldContinue) {
+        this.recognition?.start();
+        return;
+      }
+      this.state.isRecording = false;
+      this.ui.setRecordingState(false);
+      this.ui.updateGreenDot(this.state.isRecording, this.state.isLogging);
+    };
+
+    this.recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let finalChunk = '';
+      let interimChunk = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const result = event.results[i];
+        
+        if (!result || !result.length) continue;
+        const alternative = result[0];
+        if (!alternative) continue;
+
+        if (result.isFinal) {
+          finalChunk += alternative.transcript;
+        } else {
+          interimChunk += alternative.transcript;
+        }
+      }
+
+      if (finalChunk) {
+        const processed = this.handleCommands(finalChunk);
+        if (!processed.capturedByCommand) {
+           this.ui.updateText(finalChunk, interimChunk, this.state.isLogging);
+           if(this.state.isLogging) this.audio.play('click');
+        }
+      } else {
+        this.ui.updateText('', interimChunk, this.state.isLogging);
+      }
+    };
+
+    this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        this.state.shouldContinue = false;
+        this.stop();
+      }
+    };
+  }
+
+  private handleCommands(text: string): { capturedByCommand: boolean } {
+    const command = text.toLowerCase().trim().replace(/[?!]/g, ''); 
+    
+    // --- DYNAMIC COMMANDS ---
+    
+    // COMMAND: "visit [url]"
+    if (command.startsWith('visit')) {
+      this.audio.play('sniper-visit');
+      const rawUrl = command.replace('visit', '').trim();
+      this.openDirectUrl(rawUrl);
+      this.ui.clearText();
+      return { capturedByCommand: true };
     }
-  });
+
+    // COMMAND: "search [query]"
+    if (command.startsWith('search')) {
+      this.audio.play('sniper-search');
+      const query = command.replace('search', '').trim();
+      this.openSearch(query);
+      this.ui.clearText();
+      return { capturedByCommand: true };
+    }
+
+    // --- STATIC COMMANDS ---
+    switch (command.replace(/[.,]/g, '')) { 
+      case 'exit':
+        this.audio.play('sniper-exit');
+        this.ui.clearText();
+        this.state.shouldContinue = false;
+        this.stop();
+        return { capturedByCommand: true };
+
+      case 'off':
+        this.audio.play('sniper-off');
+        this.ui.clearText();
+        this.state.isLogging = false;
+        this.ui.updateGreenDot(this.state.isRecording, this.state.isLogging);
+        return { capturedByCommand: true };
+
+      case 'on':
+        this.audio.play('sniper-on');
+        this.state.isLogging = true;
+        this.ui.updateGreenDot(this.state.isRecording, this.state.isLogging);
+        return { capturedByCommand: true };
+
+      case 'clear':
+        this.audio.play('sniper-clear');
+        this.ui.clearText();
+        return { capturedByCommand: true };
+
+      case 'copy':
+        this.audio.play('sniper-copy');
+        const currentText = this.ui.getText();
+        if (currentText) {
+          navigator.clipboard.writeText(currentText);
+        }
+        this.ui.clearText();
+        return { capturedByCommand: true };
+      
+      // UPDATED: New Simplify Command
+      case 'simplify':
+        // Reuse the 'clear' sound for now, or 'exit' might feel appropriate
+        this.audio.play('sniper-clear'); 
+        this.closeOpenedWindows();
+        this.ui.clearText();
+        return { capturedByCommand: true };
+
+      default:
+        return { capturedByCommand: false };
+    }
+  }
+
+  // UPDATED: Helper to close windows tracked by Sniper
+  private closeOpenedWindows() {
+    let closedCount = 0;
+    this.openedWindows.forEach(win => {
+      if (win && !win.closed) {
+        win.close();
+        closedCount++;
+      }
+    });
+    // Reset the array
+    this.openedWindows = [];
+    console.log(`Sniper Simplified: Closed ${closedCount} tabs.`);
+  }
+
+  // Helper for "search" (Google Search)
+  private openSearch(query: string) {
+    if (!query) return;
+    const normalized = query.replace(/ dot /g, '.').replace(/ period /g, '.');
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(normalized)}`;
+    
+    // UPDATED: Track the window
+    const newWin = window.open(searchUrl, '_blank');
+    if (newWin) this.openedWindows.push(newWin);
+  }
+
+  // Helper for "visit" (Direct Navigation)
+  private openDirectUrl(transcript: string) {
+    if (!transcript) return;
+
+    let url = transcript.toLowerCase()
+      .replace(/ dot /g, '.')
+      .replace(/ period /g, '.')
+      .replace(/ slash /g, '/')
+      .replace(/\s+/g, ''); 
+
+    if (!url.startsWith('http')) {
+      url = 'https://' + url;
+    }
+    
+    // UPDATED: Track the window
+    const newWin = window.open(url, '_blank');
+    if (newWin) this.openedWindows.push(newWin);
+  }
+
+  private bindEvents() {
+    const btn = this.ui.getRecordButton();
+    if (btn) {
+      btn.addEventListener('click', () => {
+        if (this.state.isRecording) this.stop();
+        else this.start();
+      });
+    }
+  }
+
+  public start() {
+    this.state.shouldContinue = true;
+    this.state.isLogging = true;
+    this.recognition?.start();
+  }
+
+  public stop() {
+    this.state.shouldContinue = false;
+    this.recognition?.stop();
+  }
 }
 
-if (copyBtn) {
-  copyBtn.onclick = null; 
-  copyBtn.addEventListener('click', () => {
-    const text = transcriptEl.innerText;
-    if (text) {
-      navigator.clipboard.writeText(text);
-      const originalText = copyBtn.innerText;
-      copyBtn.innerText = "[ COPIED! ]";
-      setTimeout(() => {
-        copyBtn.innerText = originalText;
-      }, 2000);
-    }
-  });
-}
+/**
+ * SECTION 5: INITIALIZATION
+ */
+document.addEventListener('DOMContentLoaded', () => {
+  const audioManager = new AudioManager();
+  const uiManager = new UIManager();
+  const app = new SniperCore(audioManager, uiManager);
+});

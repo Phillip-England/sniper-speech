@@ -1,5 +1,5 @@
 dev:
-	go run main.go
+	air
 
 tw:
 	tailwindcss -i ./static/input.css -o ./static/output.css --watch;
