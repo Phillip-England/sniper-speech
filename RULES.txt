@@ -1,0 +1,25 @@
+AI CODEBASE RULES & OPERATIONAL PROTOCOLS
+================================================================
+
+RULE #1: SIMULTANEOUS KEY EVENT CYCLES (KEY UP REQUIREMENT)
+----------------------------------------------------------------
+CONTEXT:
+Running commands on the server that utilize the "Key Down" event, 
+specifically when pressing two keys simultaneously (Modifier + Key).
+
+EXAMPLES:
+- Control + P (Print)
+- Control + X (Cut)
+- Control + V (Paste)
+
+REQUIREMENT:
+Every time a "Key Down" command is executed for a key combination, 
+it must be immediately followed by a corresponding "Key Up" command 
+for those specific keys.
+
+REASONING:
+This step is mandatory to ensure the server recognizes that the 
+keys have been released. Failing to do so leaves the keys in a 
+"pressed" state, which will interfere with and corrupt the input 
+of any future commands.
+================================================================

@@ -204,7 +204,6 @@ class SniperCore {
   private ui: UIManager;
   private recognition: SpeechRecognition | null = null;
 
-  // UPDATED: Track windows opened by Sniper
   private openedWindows: Window[] = [];
 
   private state = {
@@ -296,6 +295,23 @@ class SniperCore {
     };
   }
 
+// UPDATED: New method to send command to backend
+  private async sendToBackend(command: string) {
+    try {
+      console.log(`[Sniper] Sending to backend: ${command}`);
+      // UPDATED: Added /api/data to match the Go route
+      await fetch('http://localhost:8000/api/data', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ command: command })
+      });
+    } catch (err) {
+      console.warn('[Sniper] Backend connection failed. Is localhost:8000 running?');
+    }
+  }
+
   private handleCommands(text: string): { capturedByCommand: boolean } {
     const command = text.toLowerCase().trim().replace(/[?!]/g, ''); 
     
@@ -346,7 +362,7 @@ class SniperCore {
         this.ui.clearText();
         return { capturedByCommand: true };
 
-      case 'copy':
+      case 'keep':
         this.audio.play('sniper-copy');
         const currentText = this.ui.getText();
         if (currentText) {
@@ -355,20 +371,20 @@ class SniperCore {
         this.ui.clearText();
         return { capturedByCommand: true };
       
-      // UPDATED: New Simplify Command
       case 'simplify':
-        // Reuse the 'clear' sound for now, or 'exit' might feel appropriate
         this.audio.play('sniper-clear'); 
         this.closeOpenedWindows();
         this.ui.clearText();
         return { capturedByCommand: true };
 
       default:
+        // UPDATED: Pass unrecognized commands to backend
+        this.sendToBackend(command);
+        // We return false here so the text still appears in the UI
         return { capturedByCommand: false };
     }
   }
 
-  // UPDATED: Helper to close windows tracked by Sniper
   private closeOpenedWindows() {
     let closedCount = 0;
     this.openedWindows.forEach(win => {
@@ -377,23 +393,19 @@ class SniperCore {
         closedCount++;
       }
     });
-    // Reset the array
     this.openedWindows = [];
     console.log(`Sniper Simplified: Closed ${closedCount} tabs.`);
   }
 
-  // Helper for "search" (Google Search)
   private openSearch(query: string) {
     if (!query) return;
     const normalized = query.replace(/ dot /g, '.').replace(/ period /g, '.');
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(normalized)}`;
     
-    // UPDATED: Track the window
     const newWin = window.open(searchUrl, '_blank');
     if (newWin) this.openedWindows.push(newWin);
   }
 
-  // Helper for "visit" (Direct Navigation)
   private openDirectUrl(transcript: string) {
     if (!transcript) return;
 
@@ -407,7 +419,6 @@ class SniperCore {
       url = 'https://' + url;
     }
     
-    // UPDATED: Track the window
     const newWin = window.open(url, '_blank');
     if (newWin) this.openedWindows.push(newWin);
   }

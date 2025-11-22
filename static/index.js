@@ -200,6 +200,20 @@ class SniperCore {
       }
     };
   }
+  async sendToBackend(command) {
+    try {
+      console.log(`[Sniper] Sending to backend: ${command}`);
+      await fetch("http://localhost:8000/api/data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ command })
+      });
+    } catch (err) {
+      console.warn("[Sniper] Backend connection failed. Is localhost:8000 running?");
+    }
+  }
   handleCommands(text) {
     const command = text.toLowerCase().trim().replace(/[?!]/g, "");
     if (command.startsWith("visit")) {
@@ -238,7 +252,7 @@ class SniperCore {
         this.audio.play("sniper-clear");
         this.ui.clearText();
         return { capturedByCommand: true };
-      case "copy":
+      case "keep":
         this.audio.play("sniper-copy");
         const currentText = this.ui.getText();
         if (currentText) {
@@ -252,6 +266,7 @@ class SniperCore {
         this.ui.clearText();
         return { capturedByCommand: true };
       default:
+        this.sendToBackend(command);
         return { capturedByCommand: false };
     }
   }
